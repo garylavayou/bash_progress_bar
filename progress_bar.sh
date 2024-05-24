@@ -21,17 +21,19 @@ COLOR_BG_BLOCKED="\e[43m"
 RESTORE_FG="\e[39m"
 RESTORE_BG="\e[49m"
 
-# Variables
-PROGRESS_BLOCKED="false"
-TRAPPING_ENABLED="false"
-ETA_ENABLED="false"
-TRAP_SET="false"
+# Initialize internal used variables
+function _load_variables() {
+    PROGRESS_BLOCKED="false"
+    TRAPPING_ENABLED="false"
+    ETA_ENABLED="false"
+    TRAP_SET="false"
 
-CURRENT_NR_LINES=0
-PROGRESS_TITLE=""
-PROGRESS_TOTAL=100
-PROGRESS_START=0
-BLOCKED_START=0
+    CURRENT_NR_LINES=0
+    PROGRESS_TITLE=""
+    PROGRESS_TOTAL=100
+    PROGRESS_START=0
+    BLOCKED_START=0
+}
 
 # shellcheck disable=SC2120
 setup_scroll_area() {
@@ -68,6 +70,29 @@ setup_scroll_area() {
 
     # Start empty progress bar
     draw_progress_bar 0
+}
+
+function create_progess_bar() {
+    local _short='tN:'
+    local _longs='trap,eta,size:'
+    local _parsed
+    _parsed=$(getopt --options=$_short --longoptions=$_longs --name "$0" -- "$@")
+    eval set -- "$_parsed"
+    _load_variables
+    declare -i _num_total_tasks
+    while true; do
+        case $1 in
+        -t | --eta) ETA_ENABLED=true;;
+        --trap) TRAPPING_ENABLED=true;;
+        -N | --size) _num_total_tasks=$2 && shift;;
+        --)
+            shift && break # break the while loop
+            ;;
+        esac
+        shift
+    done
+    local _progress_bar_title="$1"
+    setup_scroll_area "$_progress_bar_title" "$_num_total_tasks"
 }
 
 destroy_scroll_area() {
