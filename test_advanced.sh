@@ -23,18 +23,17 @@ main() {
     # Enable ETA
     ETA_ENABLED="true"
     # Create progress bar
-    setup_scroll_area "Processing" $MAX
+    setup_scroll_area "Processing" "$MAX"
     # Compute middle for user input test
-    let MIDDLE=MAX/2
-    for i in $(seq 1 $MAX)
-    do
-        if [ $i -eq $MIDDLE ]; then
+    ((MIDDLE = MAX / 2))
+    for i in $(seq 1 "$MAX"); do
+        if [ "$i" -eq $MIDDLE ]; then
             echo "waiting for user input"
-            block_progress_bar $i
-            read -p "User input: "
+            block_progress_bar "$i"
+            read -r -p "User input: "
         else
             generate_some_output_and_sleep
-            draw_progress_bar $i "$( date "+%r" )| $i on $MAX"
+            draw_progress_bar "$i" "$(date "+%r")| $i on $MAX"
         fi
     done
     destroy_scroll_area

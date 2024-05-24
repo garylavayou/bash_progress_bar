@@ -102,26 +102,26 @@ format_eta() {
     local H=$((T / 60 / 60 % 24))
     local M=$((T / 60 % 60))
     local S=$((T % 60))
-    [ $D -eq 0 -a $H -eq 0 -a $M -eq 0 -a $S -eq 0 ] && echo "--:--:--" && return
+    [[ $D -eq 0 && $H -eq 0 && $M -eq 0 && $S -eq 0 ]] && echo "--:--:--" && return
     [ $D -gt 0 ] && printf '%d days, ' $D
     printf 'ETA: %d:%02.f:%02.f' $H $M $S
 }
 
 draw_progress_bar() {
     eta=""
-    if [ "$ETA_ENABLED" = "true" -a $1 -gt 0 ]; then
+    if [[ "$ETA_ENABLED" = "true" && $1 -gt 0 ]]; then
         if [ "$PROGRESS_BLOCKED" = "true" ]; then
-            blocked_duration=$(($(date +%s) - $BLOCKED_START))
+            blocked_duration=$(($(date +%s) - BLOCKED_START))
             PROGRESS_START=$((PROGRESS_START + blocked_duration))
         fi
         running_time=$(($(date +%s) - PROGRESS_START))
         total_time=$((PROGRESS_TOTAL * running_time / $1))
-        eta=$(format_eta $(($total_time - $running_time)))
+        eta=$(format_eta $((total_time - running_time)))
     fi
 
     percentage=$1
     if [ $PROGRESS_TOTAL -ne 100 ]; then
-        [ $PROGRESS_TOTAL -eq 0 ] && percentage=100 || percentage=$((percentage * 100 / $PROGRESS_TOTAL))
+        [ $PROGRESS_TOTAL -eq 0 ] && percentage=100 || percentage=$((percentage * 100 / PROGRESS_TOTAL))
     fi
     extra=$2
 
@@ -166,7 +166,7 @@ block_progress_bar() {
     # Draw progress bar
     PROGRESS_BLOCKED="true"
     BLOCKED_START=$(date +%s)
-    print_bar_text $percentage
+    print_bar_text "$percentage"
 
     # Restore cursor position
     echo -en "$CODE_RESTORE_CURSOR"
@@ -197,7 +197,8 @@ print_bar_text() {
         [ -n "$extra" ] && extra="$extra "
         extra="$extra$eta"
     fi
-    local cols=$(tput cols)
+    local cols
+    cols=$(tput cols)
     bar_size=$((cols - 9 - ${#PROGRESS_TITLE} - ${#extra}))
 
     local color="${COLOR_FG}${COLOR_BG}"
