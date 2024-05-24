@@ -1,16 +1,6 @@
 #!/bin/bash
 # https://github.com/pollev/bash_progress_bar - See license at end of file
 
-# Usage:
-# Source this script
-# enable_trapping <- optional to clean up properly if user presses ctrl-c
-# setup_scroll_area <- create empty progress bar
-# draw_progress_bar 10 <- advance progress bar
-# draw_progress_bar 40 <- advance progress bar
-# block_progress_bar 45 <- turns the progress bar yellow to indicate some action is requested from the user
-# draw_progress_bar 90 <- advance progress bar
-# destroy_scroll_area <- remove progress bar
-
 # Constants
 CODE_SAVE_CURSOR="\033[s"
 CODE_RESTORE_CURSOR="\033[u"
@@ -27,6 +17,7 @@ function _load_variables() {
     TRAPPING_ENABLED="false"
     ETA_ENABLED="false"
     TRAP_SET="false"
+    PERCENT_SCALE=2
 
     CURRENT_NR_LINES=0
     PROGRESS_TITLE=""
@@ -72,9 +63,9 @@ setup_scroll_area() {
     draw_progress_bar 0
 }
 
-function create_progess_bar() {
-    local _short='tN:'
-    local _longs='trap,eta,size:'
+function create_progress_bar() {
+    local _short='N:tp:'
+    local _longs='trap,eta,size:,precision:'
     local _parsed
     _parsed=$(getopt --options=$_short --longoptions=$_longs --name "$0" -- "$@")
     eval set -- "$_parsed"
@@ -82,9 +73,10 @@ function create_progess_bar() {
     declare -i _num_total_tasks
     while true; do
         case $1 in
-        -t | --eta) ETA_ENABLED=true;;
-        --trap) TRAPPING_ENABLED=true;;
-        -N | --size) _num_total_tasks=$2 && shift;;
+        -N | --size) _num_total_tasks=$2 && shift ;;
+        -p | --precision) PERCENT_SCALE=$2 && shift ;;
+        -t | --eta) ETA_ENABLED=true ;;
+        --trap) TRAPPING_ENABLED=true ;;
         --)
             shift && break # break the while loop
             ;;
@@ -132,6 +124,20 @@ format_eta() {
     printf 'ETA: %d:%02.f:%02.f' $H $M $S
 }
 
+function _float_devide() {
+    local x=$1 y=$2 res_var=${3:-'_float_res'}
+    scale=${PERCENT_SCALE:-2}
+    ((int_scale = 10 * 10 ** scale, a = x / y, b = x % y * int_scale / y))
+    printf -v "$res_var" "%.${scale}f" "$a.$b"
+}
+
+function _percent() {
+    local _float_res # _float_res is updated by _float_devide()
+    _float_devide "$(($1 * 100))" "$2"
+    local res_var=${3:-'_percent_res'}
+    printf -v "$res_var" '%s%%' "$_float_res"
+}
+
 draw_progress_bar() {
     eta=""
     if [[ "$ETA_ENABLED" = "true" && $1 -gt 0 ]]; then
@@ -144,11 +150,9 @@ draw_progress_bar() {
         eta=$(format_eta $((total_time - running_time)))
     fi
 
-    percentage=$1
-    if [ $PROGRESS_TOTAL -ne 100 ]; then
-        [ $PROGRESS_TOTAL -eq 0 ] && percentage=100 || percentage=$((percentage * 100 / PROGRESS_TOTAL))
-    fi
-    extra=$2
+    # compute percentage as
+    _percent "$1" "$PROGRESS_TOTAL" percentage
+    extra=$2 # supplying extra message showing in progress bar
 
     lines=$(tput lines)
     lines=$((lines))
@@ -169,7 +173,7 @@ draw_progress_bar() {
 
     # Draw progress bar
     PROGRESS_BLOCKED="false"
-    print_bar_text $percentage "$extra" "$eta"
+    print_bar_text "$percentage" "$extra" "$eta"
 
     # Restore cursor position
     echo -en "$CODE_RESTORE_CURSOR"
@@ -224,7 +228,9 @@ print_bar_text() {
     fi
     local cols
     cols=$(tput cols)
-    bar_size=$((cols - 9 - ${#PROGRESS_TITLE} - ${#extra}))
+    # hard coded width includes space between fields (3), progress delimiter "[", "]"
+    # we intentionally allocated two more columns in case the ETA hour field overflow
+    bar_size=$((cols - ${#percentage} - ${#PROGRESS_TITLE} - ${#extra} - 7))
 
     local color="${COLOR_FG}${COLOR_BG}"
     if [ "$PROGRESS_BLOCKED" = "true" ]; then
@@ -232,7 +238,9 @@ print_bar_text() {
     fi
 
     # Prepare progress bar
-    complete_size=$(((bar_size * percentage) / 100))
+    local _n_percent_minor_digits=$((PERCENT_SCALE + 2))          # decimal mark, digits + "%"
+    local _progress=${percentage[*]::-${_n_percent_minor_digits}} #* quote does not allow after '::'
+    complete_size=$(((bar_size * _progress) / 100))
     remainder_size=$((bar_size - complete_size))
     progress_bar=$(
         echo -ne "["
@@ -244,7 +252,7 @@ print_bar_text() {
     )
 
     # Print progress bar
-    echo -ne " $PROGRESS_TITLE ${percentage}% ${progress_bar}${extra}"
+    echo -ne "$PROGRESS_TITLE ${percentage} ${progress_bar} ${extra}"
 }
 
 enable_trapping() {
