@@ -48,7 +48,7 @@ setup_scroll_area() {
 
     lines=$(tput lines)
     CURRENT_NR_LINES=$lines
-    lines=$((lines-1))
+    lines=$((lines - 1))
     # Scroll down a bit to avoid visual glitch when the screen area shrinks by one row
     echo -en "\n"
 
@@ -63,7 +63,7 @@ setup_scroll_area() {
 
     # Store start timestamp to compute ETA
     if [ "$ETA_ENABLED" = "true" ]; then
-      PROGRESS_START=$( date +%s )
+        PROGRESS_START=$(date +%s)
     fi
 
     # Start empty progress bar
@@ -98,10 +98,10 @@ destroy_scroll_area() {
 
 format_eta() {
     local T=$1
-    local D=$((T/60/60/24))
-    local H=$((T/60/60%24))
-    local M=$((T/60%60))
-    local S=$((T%60))
+    local D=$((T / 60 / 60 / 24))
+    local H=$((T / 60 / 60 % 24))
+    local M=$((T / 60 % 60))
+    local S=$((T % 60))
     [ $D -eq 0 -a $H -eq 0 -a $M -eq 0 -a $S -eq 0 ] && echo "--:--:--" && return
     [ $D -gt 0 ] && printf '%d days, ' $D
     printf 'ETA: %d:%02.f:%02.f' $H $M $S
@@ -111,18 +111,17 @@ draw_progress_bar() {
     eta=""
     if [ "$ETA_ENABLED" = "true" -a $1 -gt 0 ]; then
         if [ "$PROGRESS_BLOCKED" = "true" ]; then
-            blocked_duration=$(($(date +%s)-$BLOCKED_START))
-            PROGRESS_START=$((PROGRESS_START+blocked_duration))
+            blocked_duration=$(($(date +%s) - $BLOCKED_START))
+            PROGRESS_START=$((PROGRESS_START + blocked_duration))
         fi
-        running_time=$(($(date +%s)-PROGRESS_START))
-        total_time=$((PROGRESS_TOTAL*running_time/$1))
-        eta=$( format_eta $(($total_time-$running_time)) )
+        running_time=$(($(date +%s) - PROGRESS_START))
+        total_time=$((PROGRESS_TOTAL * running_time / $1))
+        eta=$(format_eta $(($total_time - $running_time)))
     fi
 
     percentage=$1
-    if [ $PROGRESS_TOTAL -ne 100 ]
-    then
-	[ $PROGRESS_TOTAL -eq 0 ] && percentage=100 || percentage=$((percentage*100/$PROGRESS_TOTAL))
+    if [ $PROGRESS_TOTAL -ne 100 ]; then
+        [ $PROGRESS_TOTAL -eq 0 ] && percentage=100 || percentage=$((percentage * 100 / $PROGRESS_TOTAL))
     fi
     extra=$2
 
@@ -166,7 +165,7 @@ block_progress_bar() {
 
     # Draw progress bar
     PROGRESS_BLOCKED="true"
-    BLOCKED_START=$( date +%s )
+    BLOCKED_START=$(date +%s)
     print_bar_text $percentage
 
     # Restore cursor position
@@ -199,7 +198,7 @@ print_bar_text() {
         extra="$extra$eta"
     fi
     local cols=$(tput cols)
-    bar_size=$((cols-9-${#PROGRESS_TITLE}-${#extra}))
+    bar_size=$((cols - 9 - ${#PROGRESS_TITLE} - ${#extra}))
 
     local color="${COLOR_FG}${COLOR_BG}"
     if [ "$PROGRESS_BLOCKED" = "true" ]; then
@@ -207,9 +206,16 @@ print_bar_text() {
     fi
 
     # Prepare progress bar
-    complete_size=$(((bar_size*percentage)/100))
-    remainder_size=$((bar_size-complete_size))
-    progress_bar=$(echo -ne "["; echo -en "${color}"; printf_new "#" $complete_size; echo -en "${RESTORE_FG}${RESTORE_BG}"; printf_new "." $remainder_size; echo -ne "]");
+    complete_size=$(((bar_size * percentage) / 100))
+    remainder_size=$((bar_size - complete_size))
+    progress_bar=$(
+        echo -ne "["
+        echo -en "${color}"
+        printf_new "#" $complete_size
+        echo -en "${RESTORE_FG}${RESTORE_BG}"
+        printf_new "." $remainder_size
+        echo -ne "]"
+    )
 
     # Print progress bar
     echo -ne " $PROGRESS_TITLE ${percentage}% ${progress_bar}${extra}"
@@ -236,7 +242,6 @@ printf_new() {
     v=$(printf "%-${num}s" "$str")
     echo -ne "${v// /$str}"
 }
-
 
 # SPDX-License-Identifier: MIT
 #
