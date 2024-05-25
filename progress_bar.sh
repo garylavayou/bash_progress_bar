@@ -84,25 +84,25 @@ function create_progress_bar() {
         shift
     done
     local _progress_bar_title="$1"
-    setup_scroll_area "$_progress_bar_title" "$_num_total_tasks"
+    setup_scroll_area "$_progress_bar_title" "$_num_total_tasks" 1>&2
 }
 
 destroy_scroll_area() {
     lines=$(tput lines)
     # Save cursor
-    echo -en "$CODE_SAVE_CURSOR"
+    echo -en "$CODE_SAVE_CURSOR" 1>&2
     # Set scroll region (this will place the cursor in the top left)
-    echo -en "\033[0;${lines}r"
+    echo -en "\033[0;${lines}r" 1>&2
 
     # Restore cursor but ensure its inside the scrolling area
-    echo -en "$CODE_RESTORE_CURSOR"
-    echo -en "$CODE_CURSOR_IN_SCROLL_AREA"
+    echo -en "$CODE_RESTORE_CURSOR" 1>&2
+    echo -en "$CODE_CURSOR_IN_SCROLL_AREA" 1>&2
 
     # We are done so clear the scroll bar
-    clear_progress_bar
+    _clear_progress_bar 1>&2
 
     # Scroll down a bit to avoid visual glitch when the screen area grows by one row
-    echo -en "\n\n"
+    echo -en "\n\n" 1>&2
 
     # Reset title for next usage
     PROGRESS_TITLE=""
@@ -125,8 +125,7 @@ format_eta() {
 }
 
 function _float_devide() {
-    local x=$1 y=$2 res_var=${3:-'_float_res'}
-    scale=${PERCENT_SCALE:-2}
+    local x=$1 y=$2 res_var=${3:-'_float_res'} scale=${PERCENT_SCALE:-2} int_scale
     ((int_scale = 10 * 10 ** scale, a = x / y, b = x % y * int_scale / y))
     printf -v "$res_var" "%.${scale}f" "$a.$b"
 }
@@ -159,24 +158,24 @@ draw_progress_bar() {
 
     # Check if the window has been resized. If so, reset the scroll area
     if [ "$lines" -ne "$CURRENT_NR_LINES" ]; then
-        setup_scroll_area
+        setup_scroll_area 1>&2
     fi
 
     # Save cursor
-    echo -en "$CODE_SAVE_CURSOR"
+    echo -en "$CODE_SAVE_CURSOR" 1>&2
 
     # Move cursor position to last row
-    echo -en "\033[${lines};0f"
+    echo -en "\033[${lines};0f" 1>&2
 
     # Clear progress bar
     tput el
 
     # Draw progress bar
     PROGRESS_BLOCKED="false"
-    print_bar_text "$percentage" "$extra" "$eta"
+    print_bar_text "$percentage" "$extra" "$eta" 1>&2
 
     # Restore cursor position
-    echo -en "$CODE_RESTORE_CURSOR"
+    echo -en "$CODE_RESTORE_CURSOR" 1>&2
 }
 
 block_progress_bar() {
@@ -184,10 +183,10 @@ block_progress_bar() {
     lines=$(tput lines)
     lines=$((lines))
     # Save cursor
-    echo -en "$CODE_SAVE_CURSOR"
+    echo -en "$CODE_SAVE_CURSOR" 1>&2
 
     # Move cursor position to last row
-    echo -en "\033[${lines};0f"
+    echo -en "\033[${lines};0f" 1>&2
 
     # Clear progress bar
     tput el
@@ -195,10 +194,10 @@ block_progress_bar() {
     # Draw progress bar
     PROGRESS_BLOCKED="true"
     BLOCKED_START=$(date +%s)
-    print_bar_text "$percentage"
+    print_bar_text "$percentage" 1>&2
 
     # Restore cursor position
-    echo -en "$CODE_RESTORE_CURSOR"
+    echo -en "$CODE_RESTORE_CURSOR" 1>&2
 }
 
 clear_progress_bar() {
@@ -252,7 +251,7 @@ print_bar_text() {
     )
 
     # Print progress bar
-    echo -ne "$PROGRESS_TITLE ${percentage} ${progress_bar} ${extra}"
+    echo -ne "$PROGRESS_TITLE ${percentage} ${progress_bar} ${extra}" 
 }
 
 enable_trapping() {
