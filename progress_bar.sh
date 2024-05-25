@@ -20,7 +20,7 @@ function _load_variables() {
     PERCENT_SCALE=2
 
     CURRENT_NR_LINES=0
-    PROGRESS_TITLE=""
+    PROGRESS_TITLE="Progress"
     PROGRESS_TOTAL=100
     PROGRESS_START=0
     BLOCKED_START=0
@@ -34,10 +34,10 @@ setup_scroll_area() {
     fi
 
     # Handle first parameter: alternative progress bar title
-    [ -n "$1" ] && PROGRESS_TITLE="$1" || PROGRESS_TITLE="Progress"
+    [ -n "$1" ] && PROGRESS_TITLE=$1
 
     # Handle second parameter : alternative total count
-    [ -n "$2" ] && PROGRESS_TOTAL=$2 || PROGRESS_TOTAL=100
+    [ -n "$2" ] && PROGRESS_TOTAL=$2
 
     lines=$(tput lines)
     CURRENT_NR_LINES=$lines
@@ -56,11 +56,12 @@ setup_scroll_area() {
 
     # Store start timestamp to compute ETA
     if [ "$ETA_ENABLED" = "true" ]; then
-        PROGRESS_START=$(date +%s)
+        # use bash variable $SECONDS to count time
+        PROGRESS_START=$SECONDS
     fi
 
     # Start empty progress bar
-    draw_progress_bar 0
+    draw_progress_bar "$_current_progress"
 }
 
 function create_progress_bar() {
@@ -99,13 +100,10 @@ destroy_scroll_area() {
     echo -en "$CODE_CURSOR_IN_SCROLL_AREA" 1>&2
 
     # We are done so clear the scroll bar
-    _clear_progress_bar 1>&2
+    clear_progress_bar 1>&2
 
     # Scroll down a bit to avoid visual glitch when the screen area grows by one row
     echo -en "\n\n" 1>&2
-
-    # Reset title for next usage
-    PROGRESS_TITLE=""
 
     # Once the scroll area is cleared, we want to remove any trap previously set. Otherwise, ctrl+c will exit our shell
     if [ "$TRAP_SET" = "true" ]; then
@@ -124,39 +122,48 @@ format_eta() {
     printf 'ETA: %d:%02.f:%02.f' $H $M $S
 }
 
-function _float_devide() {
+function _float_divide() {
     local x=$1 y=$2 res_var=${3:-'_float_res'} scale=${PERCENT_SCALE:-2} int_scale
-    ((int_scale = 10 * 10 ** scale, a = x / y, b = x % y * int_scale / y))
+    #! integer division with x smaller than y, output is 0, but will return status code of 1.
+    #* we will ignore this error.
+    ((int_scale = 10 * 10 ** scale, a = x / y, b = (x % y) * int_scale / y)) && true
     printf -v "$res_var" "%.${scale}f" "$a.$b"
 }
 
 function _percent() {
-    local _float_res # _float_res is updated by _float_devide()
-    _float_devide "$(($1 * 100))" "$2"
+    local _float_res # _float_res is updated by _float_divide()
+    _float_divide "$(($1 * 100))" "$2"
     local res_var=${3:-'_percent_res'}
     printf -v "$res_var" '%s%%' "$_float_res"
 }
 
 draw_progress_bar() {
+    #* if arg1 is empty, set `_current_progress` to 0
+    #* `_current_progress` will be refered if we resizing the terminal.
+    _current_progress=${1:-'0'}
     eta=""
-    if [[ "$ETA_ENABLED" = "true" && $1 -gt 0 ]]; then
+    if [[ "$ETA_ENABLED" = "true" && "$_current_progress" -gt 0 ]]; then
+        # use bash variable $SECONDS to count time
         if [ "$PROGRESS_BLOCKED" = "true" ]; then
-            blocked_duration=$(($(date +%s) - BLOCKED_START))
+            blocked_duration=$((SECONDS - BLOCKED_START))
             PROGRESS_START=$((PROGRESS_START + blocked_duration))
         fi
-        running_time=$(($(date +%s) - PROGRESS_START))
-        total_time=$((PROGRESS_TOTAL * running_time / $1))
+        running_time=$((SECONDS - PROGRESS_START))
+        total_time=$((PROGRESS_TOTAL * running_time / _current_progress))
         eta=$(format_eta $((total_time - running_time)))
     fi
 
     # compute percentage as
-    _percent "$1" "$PROGRESS_TOTAL" percentage
+    _percent "$_current_progress" "$PROGRESS_TOTAL" percentage
     extra=$2 # supplying extra message showing in progress bar
 
     lines=$(tput lines)
     lines=$((lines))
 
-    # Check if the window has been resized. If so, reset the scroll area
+    # If the window has been resized, reset the scroll area
+    #* Since this is an internal update, we do not provide the title and total
+    #* number parameter for the setup function. Hence, the corresponding
+    #* title and progress information remain consistent before/after resizing.
     if [ "$lines" -ne "$CURRENT_NR_LINES" ]; then
         setup_scroll_area 1>&2
     fi
@@ -168,7 +175,7 @@ draw_progress_bar() {
     echo -en "\033[${lines};0f" 1>&2
 
     # Clear progress bar
-    tput el
+    tput el 1>&2
 
     # Draw progress bar
     PROGRESS_BLOCKED="false"
@@ -189,11 +196,12 @@ block_progress_bar() {
     echo -en "\033[${lines};0f" 1>&2
 
     # Clear progress bar
-    tput el
+    tput el 1>&2
 
     # Draw progress bar
     PROGRESS_BLOCKED="true"
-    BLOCKED_START=$(date +%s)
+    # use bash variable $SECONDS to count time
+    BLOCKED_START=$SECONDS
     print_bar_text "$percentage" 1>&2
 
     # Restore cursor position
@@ -261,6 +269,8 @@ enable_trapping() {
 trap_on_interrupt() {
     # If this function is called, we setup an interrupt handler to cleanup the progress bar
     TRAP_SET="true"
+    #! trap will not work if your declare the trap in an interactive shell.
+    #! So, always use progress bar in a bash script!
     trap cleanup_on_interrupt EXIT
 }
 
